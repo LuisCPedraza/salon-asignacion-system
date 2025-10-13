@@ -1,56 +1,89 @@
 import json
 import os
+from typing import Dict, List, Optional, Any
 import uuid
-from typing import Dict, List, Optional
 
 class DatabaseManager:
-    def __init__(self, db_file: str = 'db_data/usuarios.json'):
-        self.db_file = db_file
-        self.data: List[Dict] = self._load_data()
+    def __init__(self, base_dir: str = 'db_data'):
+        self.base_dir = base_dir
+        os.makedirs(base_dir, exist_ok=True)
+        self.data: Dict[str, List[Dict]] = self._load_all_data()
 
-    def _load_data(self) -> List[Dict]:
-        """Carga datos desde JSON (simula SELECT * FROM usuario)."""
-        if os.path.exists(self.db_file):
-            with open(self.db_file, 'r') as f:
-                return json.load(f)
-        return []  # BD vacía inicial
+    def _load_all_data(self) -> Dict[str, List[Dict]]:
+        """Carga todas tablas desde JSON (usuarios.json, grupos.json, etc.)."""
+        tables = {}
+        for filename in os.listdir(self.base_dir):
+            if filename.endswith('.json'):
+                table_name = filename[:-5]  # e.g., usuarios.json → 'usuarios'
+                file_path = os.path.join(self.base_dir, filename)
+                with open(file_path, 'r') as f:
+                    tables[table_name] = json.load(f)
+        # Inicializa tablas vacías si no existen
+        if 'usuarios' not in tables:
+            tables['usuarios'] = []
+        if 'grupos' not in tables:
+            tables['grupos'] = []
+        return tables
 
-    def _save_data(self):
-        """Guarda datos a JSON (simula INSERT/UPDATE)."""
-        os.makedirs(os.path.dirname(self.db_file), exist_ok=True)
-        with open(self.db_file, 'w') as f:
-            json.dump(self.data, f, indent=2)
+    def _save_table(self, table_name: str):
+        """Guarda tabla específica a JSON."""
+        file_path = os.path.join(self.base_dir, f"{table_name}.json")
+        with open(file_path, 'w') as f:
+            json.dump(self.data.get(table_name, []), f, indent=2)
 
-    def create_user(self, user_data: Dict) -> Optional[str]:
-        """HU1: Crea usuario (verifica email único, simula UNIQUE constraint)."""
-        # Simula UK check
-        if any(u['email'] == user_data['email'] for u in self.data):
-            return None  # Error: duplicado
-        user_data['id'] = user_data.get('id', str(uuid.uuid4()))  # UUID si no proporcionado
-        user_data['created_at'] = user_data.get('created_at', None)
-        user_data['updated_at'] = user_data.get('updated_at', None)
-        self.data.append(user_data)
-        self._save_data()
-        return user_data['id']
+    def create_entity(self, table: str, entity_data: Dict[str, Any], unique_fields: List[str] = []) -> Optional[str]:
+        """Generic create (HU1/HU3: Valida unique si fields)."""
+        if unique_fields:
+            for field in unique_fields:
+                if any(e.get(field) == entity_data.get(field) for e in self.data.get(table, [])):
+                    return None  # Duplicado
+        entity_id = entity_data.get('id', str(uuid.uuid4()))  # UUID
+        entity_data['id'] = entity_id
+        entity_data['created_at'] = entity_data.get('created_at', None)
+        entity_data['updated_at'] = entity_data.get('updated_at', None)
+        if table not in self.data:
+            self.data[table] = []
+        self.data[table].append(entity_data)
+        self._save_table(table)
+        return entity_id
 
-    def get_user_by_email(self, email: str) -> Optional[Dict]:
-        """HU2: Busca por email (simula SELECT WHERE email)."""
-        for user in self.data:
-            if user['email'] == email:
-                return user
+    def get_entity_by_id(self, table: str, entity_id: str) -> Optional[Dict[str, Any]]:
+        """Generic get by ID."""
+        for entity in self.data.get(table, []):
+            if entity['id'] == entity_id:
+                return entity
         return None
 
-    def update_user(self, user_id: str, updates: Dict) -> bool:
-        """HU1: Actualiza (e.g., desactivar: set activo=False)."""
-        for user in self.data:
-            if user['id'] == user_id:
-                user.update(updates)
-                user['updated_at'] = None  # Timestamp en real BD
-                self._save_data()
+    def get_all_entities(self, table: str) -> List[Dict[str, Any]]:
+        """Generic list all (para /users GET)."""
+        return self.data.get(table, [])
+
+    def update_entity(self, table: str, entity_id: str, updates: Dict[str, Any]) -> bool:
+        """Generic update."""
+        for entity in self.data.get(table, []):
+            if entity['id'] == entity_id:
+                entity.update(updates)
+                entity['updated_at'] = None
+                self._save_table(table)
                 return True
         return False
 
-    def delete_user(self, user_id: str) -> bool:
-        """HU1: Desactiva (soft delete: set activo=False)."""
-        return self.update_user(user_id, {'activo': False})
-    
+    def delete_entity(self, table: str, entity_id: str) -> bool:
+        """Generic soft delete (set activo=False)."""
+        return self.update_entity(table, entity_id, {'activo': False})
+
+# Backward compat for Usuario (reemplaza calls)
+def create_user(user_data: Dict) -> Optional[str]:
+    dm = DatabaseManager()
+    return dm.create_entity('usuarios', user_data, ['email'])
+
+def get_user_by_email(email: str) -> Optional[Dict]:
+    dm = DatabaseManager()
+    for user in dm.get_all_entities('usuarios'):
+        if user['email'] == email:
+            return user
+    return None
+
+def update_user(user_id: str, updates: Dict) -> bool:
+    dm = DatabaseManager()
+    return dm.update_entity('usuarios', user_id, updates)
