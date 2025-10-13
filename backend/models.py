@@ -294,3 +294,160 @@ class Profesor:
 
     def es_activo(self):
         return self.activo
+
+class ParametroSistema:
+    _db = DatabaseManager()  # Usa global para todas tablas
+
+    def __init__(self, id=None, clave=None, valor=None, scope=None, activo=True, created_at=None, updated_at=None):
+        self.id = id or str(uuid.uuid4())
+        self.clave = clave  # VARCHAR(120) UK
+        self.valor = valor  # JSON
+        self.scope = scope  # VARCHAR(60)
+        self.activo = activo  # TINYINT(1)
+        self.created_at = created_at or None
+        self.updated_at = updated_at or None
+
+    @classmethod
+    def create(cls, clave: str, valor: Dict, scope: str = '') -> Optional['ParametroSistema']:
+        """HU19: Crea parámetro persistente (valida clave única)."""
+        if not clave:
+            return None
+        param_data = {
+            'clave': clave,
+            'valor': valor,
+            'scope': scope,
+            'activo': True
+        }
+        param_id = cls._db.create_entity('parametros', param_data, ['clave'])  # Unique 'clave'
+        if param_id:
+            param_data['id'] = param_id
+            return cls(**param_data)
+        return None  # Fallo: clave duplicada
+
+    @classmethod
+    def get_by_id(cls, param_id: str) -> Optional['ParametroSistema']:
+        """HU19: Carga por ID."""
+        param_data = cls._db.get_entity_by_id('parametros', param_id)
+        if param_data:
+            return cls(**param_data)
+        return None
+
+    @classmethod
+    def get_all(cls) -> list['ParametroSistema']:
+        """HU19: Lista todos parámetros."""
+        params_data = cls._db.get_all_entities('parametros')
+        return [cls(**p) for p in params_data]
+
+    @classmethod
+    def update_by_id(cls, param_id: str, updates: Dict) -> bool:
+        """Update by ID (para API)."""
+        param_data = cls._db.get_entity_by_id('parametros', param_id)
+        if param_data:
+            return cls._db.update_entity('parametros', param_id, updates)
+        return False
+
+    @classmethod
+    def delete_by_id(cls, param_id: str) -> bool:
+        """Delete by ID (soft)."""
+        return cls._db.delete_entity('parametros', param_id)
+
+    def update(self, updates: Dict) -> bool:
+        """HU19: Actualiza."""
+        if not self.id:
+            return False
+        updates['updated_at'] = None
+        return self._db.update_entity('parametros', self.id, updates)
+
+    def delete(self) -> bool:
+        """HU19: Desactiva."""
+        if not self.id:
+            return False
+        return self.update({'activo': False})
+
+    def es_activo(self):
+        return self.activo
+
+class Asignacion:
+    _db = DatabaseManager()  # Usa global para todas tablas
+
+    def __init__(self, id=None, grupo_id=None, salon_id=None, profesor_id=None, bloque_id=None, periodo_id=None, estado='Propuesta', origen='Manual', score=0.0, created_by=None, activo=True, created_at=None, updated_at=None):
+        self.id = id or str(uuid.uuid4())
+        self.grupo_id = grupo_id  # FK grupo.id
+        self.salon_id = salon_id  # FK salon.id
+        self.profesor_id = profesor_id  # FK profesor.id
+        self.bloque_id = bloque_id  # FK bloque_horario.id
+        self.periodo_id = periodo_id  # FK periodo_academico.id
+        self.estado = estado  # ENUM 'Propuesta/Confirmada/Anulada'
+        self.origen = origen  # ENUM 'Manual/Automática'
+        self.score = score  # FLOAT
+        self.created_by = created_by  # FK usuario.id
+        self.activo = activo  # TINYINT(1)
+        self.created_at = created_at or None
+        self.updated_at = updated_at or None
+
+    @classmethod
+    def create(cls, grupo_id: str, salon_id: str, profesor_id: str, bloque_id: str, periodo_id: str, origen: str = 'Manual', created_by: str = '') -> Optional['Asignacion']:
+        """HU11: Crea asignación manual (stub valida FKs existen)."""
+        # Stub valida: Asume IDs válidos (futuro query models)
+        if not all([grupo_id, salon_id, profesor_id, bloque_id, periodo_id]):
+            return None
+        asignacion_data = {
+            'grupo_id': grupo_id,
+            'salon_id': salon_id,
+            'profesor_id': profesor_id,
+            'bloque_id': bloque_id,
+            'periodo_id': periodo_id,
+            'estado': 'Propuesta',
+            'origen': origen,
+            'score': 0.0,
+            'created_by': created_by,
+            'activo': True
+        }
+        asignacion_id = cls._db.create_entity('asignaciones', asignacion_data, [])  # No unique por doc (futuro UNIQUE grupo/bloque/periodo)
+        if asignacion_id:
+            asignacion_data['id'] = asignacion_id
+            return cls(**asignacion_data)
+        return None
+
+    @classmethod
+    def get_by_id(cls, asignacion_id: str) -> Optional['Asignacion']:
+        """HU12: Carga por ID."""
+        asignacion_data = cls._db.get_entity_by_id('asignaciones', asignacion_id)
+        if asignacion_data:
+            return cls(**asignacion_data)
+        return None
+
+    @classmethod
+    def get_all(cls) -> list['Asignacion']:
+        """HU12: Lista todas asignaciones."""
+        asignaciones_data = cls._db.get_all_entities('asignaciones')
+        return [cls(**a) for a in asignaciones_data]
+
+    @classmethod
+    def update_by_id(cls, asignacion_id: str, updates: Dict) -> bool:
+        """Update by ID (para API)."""
+        asignacion_data = cls._db.get_entity_by_id('asignaciones', asignacion_id)
+        if asignacion_data:
+            return cls._db.update_entity('asignaciones', asignacion_id, updates)
+        return False
+
+    @classmethod
+    def delete_by_id(cls, asignacion_id: str) -> bool:
+        """Delete by ID (soft)."""
+        return cls._db.delete_entity('asignaciones', asignacion_id)
+
+    def update(self, updates: Dict) -> bool:
+        """HU12: Actualiza (e.g., confirmar estado)."""
+        if not self.id:
+            return False
+        updates['updated_at'] = None
+        return self._db.update_entity('asignaciones', self.id, updates)
+
+    def delete(self) -> bool:
+        """HU12: Desactiva."""
+        if not self.id:
+            return False
+        return self.update({'activo': False})
+
+    def es_activo(self):
+        return self.activo
