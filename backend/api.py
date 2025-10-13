@@ -4,7 +4,7 @@ import json
 import urllib.parse
 from http import HTTPStatus
 from typing import Dict, Any
-from models import Grupo, Profesor, Usuario, Salon
+from models import Grupo, ParametroSistema, Profesor, Usuario, Salon
 
 PORT = 8000
 
@@ -21,8 +21,11 @@ class APIServerRequestHandler(http.server.BaseHTTPRequestHandler):
             salones = Salon.get_all()  # HU6
             self._send_json_response([s.__dict__ for s in salones], HTTPStatus.OK)
         elif parsed_path.path == '/profesores':
-            profesores = Profesor.get_all()  # HU8: Lista profesores
+            profesores = Profesor.get_all()  # HU8
             self._send_json_response([p.__dict__ for p in profesores], HTTPStatus.OK)
+        elif parsed_path.path == '/parametros':
+            params = ParametroSistema.get_all()  # HU19: Lista parámetros
+            self._send_json_response([p.__dict__ for p in params], HTTPStatus.OK)
         else:
             self._send_json_response({'error': 'Endpoint no encontrado'}, HTTPStatus.NOT_FOUND)
 
@@ -84,14 +87,24 @@ class APIServerRequestHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json_response({'id': profesor.id, 'message': 'Profesor creado'}, HTTPStatus.CREATED)
             else:
                 self._send_json_response({'error': 'usuario_id inválido o duplicado'}, HTTPStatus.BAD_REQUEST)
+        elif parsed_path.path == '/parametros':
+            param = ParametroSistema.create(
+                parsed_data.get('clave'),
+                parsed_data.get('valor', {}),  # JSON dict
+                parsed_data.get('scope', '')
+            )
+            if param:
+                self._send_json_response({'id': param.id, 'message': 'Parámetro creado'}, HTTPStatus.CREATED)
+            else:
+                self._send_json_response({'error': 'clave inválida o duplicada'}, HTTPStatus.BAD_REQUEST)
         else:
             self._send_json_response({'error': 'Endpoint no encontrado'}, HTTPStatus.NOT_FOUND)
 
     def do_PUT(self):
-        """PUT /{entity}/{id}: Update (grupos/salones/profesores)."""
+        """PUT /{entity}/{id}: Update (grupos/salones/profesores/parametros)."""
         parsed_path = urllib.parse.urlparse(self.path)
         path_parts = parsed_path.path.split('/')
-        if len(path_parts) == 3 and path_parts[1] in ['grupos', 'salones', 'profesores']:
+        if len(path_parts) == 3 and path_parts[1] in ['grupos', 'salones', 'profesores', 'parametros']:
             entity = path_parts[1]
             entity_id = path_parts[2]
             content_length = int(self.headers['Content-Length'])
@@ -103,6 +116,8 @@ class APIServerRequestHandler(http.server.BaseHTTPRequestHandler):
                 success = Salon.update_by_id(entity_id, parsed_data)
             elif entity == 'profesores':
                 success = Profesor.update_by_id(entity_id, parsed_data)
+            elif entity == 'parametros':
+                success = ParametroSistema.update_by_id(entity_id, parsed_data)
             if success:
                 self._send_json_response({'message': f'{entity[:-1]} actualizado'}, HTTPStatus.OK)
             else:
@@ -111,10 +126,10 @@ class APIServerRequestHandler(http.server.BaseHTTPRequestHandler):
             self._send_json_response({'error': 'Endpoint no encontrado'}, HTTPStatus.NOT_FOUND)
 
     def do_DELETE(self):
-        """DELETE /{entity}/{id}: Desactiva (grupos/salones/profesores)."""
+        """DELETE /{entity}/{id}: Desactiva (grupos/salones/profesores/parametros)."""
         parsed_path = urllib.parse.urlparse(self.path)
         path_parts = parsed_path.path.split('/')
-        if len(path_parts) == 3 and path_parts[1] in ['grupos', 'salones', 'profesores']:
+        if len(path_parts) == 3 and path_parts[1] in ['grupos', 'salones', 'profesores', 'parametros']:
             entity = path_parts[1]
             entity_id = path_parts[2]
             if entity == 'grupos':
@@ -123,6 +138,8 @@ class APIServerRequestHandler(http.server.BaseHTTPRequestHandler):
                 success = Salon.delete_by_id(entity_id)
             elif entity == 'profesores':
                 success = Profesor.delete_by_id(entity_id)
+            elif entity == 'parametros':
+                success = ParametroSistema.delete_by_id(entity_id)
             if success:
                 self._send_json_response({'message': f'{entity[:-1]} desactivado'}, HTTPStatus.OK)
             else:
