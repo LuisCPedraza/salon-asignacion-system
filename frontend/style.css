@@ -22,3 +22,9 @@ button:hover { background: #0056b3; }
 #groupMessage { margin: 10px 0; padding: 10px; text-align: center; }
 #groupList li button:hover { opacity: 0.8; }
 
+#salonList { list-style: none; padding: 0; }
+#salonList li { padding: 10px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+#salonList button { margin-left: 10px; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer; width: auto; }
+#salonList button:first-of-type { background: #ffc107; color: black; }
+#salonMessage { margin: 10px 0; padding: 10px; text-align: center; }
+#salonList li button:hover { opacity: 0.8; }

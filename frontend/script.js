@@ -94,6 +94,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     dashboard.innerHTML += '<p>Acceso restringido: Solo COORDINADOR/ADMIN para grupos.</p>';
                 }
+
+                // ========== NUEVA FUNCIONALIDAD PARA ÉPICA 3: GESTIÓN DE SALONES ==========
+                if (data.rol === 'coord_INFRA' || data.rol === 'ADMIN') {  // Simple rol check (HU5-HU6 acceso)
+                    const salonesSectionHTML = `
+                        <h3>Gestión de Salones (Épica 3)</h3>
+                        <form id="createSalonForm">
+                            <label for="salonCodigo">Código:</label>
+                            <input type="text" id="salonCodigo" required>
+                            <label for="salonCapacidad">Capacidad:</label>
+                            <input type="number" id="salonCapacidad" min="1" required>
+                            <label for="salonUbicacion">Ubicación:</label>
+                            <textarea id="salonUbicacion"></textarea>
+                            <button type="submit">Crear Salón</button>
+                        </form>
+                        <div id="salonMessage"></div>
+                        <h3>Lista de Salones</h3>
+                        <ul id="salonList"></ul>
+                    `;
+                    dashboard.innerHTML += salonesSectionHTML;
+                    loadSalones();  // Carga inicial lista
+
+                    // Event listener para create form
+                    const createSalonForm = document.getElementById('createSalonForm');
+                    createSalonForm.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        createSalon();
+                    });
+                } else {
+                    dashboard.innerHTML += '<p>Acceso restringido: Solo coord_INFRA/ADMIN para salones.</p>';
+                }
                 // ========== FIN NUEVA FUNCIONALIDAD ==========
 
             } else {
@@ -253,3 +283,104 @@ async function deleteGroup(groupId) {
         }
     }
 }
+
+// ========== FUNCIONES PARA SALONES (NUEVAS) ==========
+// Funciones para salones
+async function createSalon() {
+    const codigo = document.getElementById('salonCodigo').value;
+    const capacidad = parseInt(document.getElementById('salonCapacidad').value);
+    const ubicacion = document.getElementById('salonUbicacion').value;
+    const message = document.getElementById('salonMessage');
+
+    if (capacidad <= 0) {
+        message.textContent = 'Capacidad debe ser >0';
+        message.className = 'error';
+        return;
+    }
+
+    try {
+        const response = await fetch('http://localhost:8000/salones', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ codigo, capacidad, ubicacion })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            message.textContent = data.message || 'Salón creado!';
+            message.className = 'success';
+            document.getElementById('createSalonForm').reset();
+            loadSalones();  // Refresca lista
+        } else {
+            message.textContent = data.error || 'Error al crear';
+            message.className = 'error';
+        }
+    } catch (error) {
+        message.textContent = 'Error de conexión: ' + error.message;
+        message.className = 'error';
+    }
+}
+
+async function loadSalones() {
+    try {
+        const response = await fetch('http://localhost:8000/salones');
+        const salones = await response.json();
+        const list = document.getElementById('salonList');
+        list.innerHTML = salones.map(salon => `
+            <li>
+                ${salon.codigo} (Cap: ${salon.capacidad}) - ${salon.ubicacion} 
+                ${salon.activo ? '(Activo)' : '(Inactivo)'} 
+                <button onclick="updateSalon('${salon.id}')">Editar</button>
+                <button onclick="deleteSalon('${salon.id}')">Desactivar</button>
+            </li>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading salones:', error);
+    }
+}
+
+async function updateSalon(salonId) {
+    const cap = prompt('Nueva capacidad (actual: ?)', '');  // Simple prompt para update (HU6)
+    if (cap && parseInt(cap) > 0) {
+        try {
+            const response = await fetch(`http://localhost:8000/salones/${salonId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ capacidad: parseInt(cap) })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById('salonMessage').textContent = data.message;
+                document.getElementById('salonMessage').className = 'success';
+                loadSalones();  // Refresca
+            } else {
+                document.getElementById('salonMessage').textContent = data.error;
+                document.getElementById('salonMessage').className = 'error';
+            }
+        } catch (error) {
+            console.error('Error updating salon:', error);
+        }
+    }
+}
+
+async function deleteSalon(salonId) {
+    if (confirm('Desactivar salón?')) {
+        try {
+            const response = await fetch(`http://localhost:8000/salones/${salonId}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById('salonMessage').textContent = data.message;
+                document.getElementById('salonMessage').className = 'success';
+                loadSalones();  // Refresca
+            } else {
+                document.getElementById('salonMessage').textContent = data.error;
+                document.getElementById('salonMessage').className = 'error';
+            }
+        } catch (error) {
+            console.error('Error deleting salon:', error);
+        }
+    }
+}
+// ========== FIN FUNCIONES SALONES ==========
