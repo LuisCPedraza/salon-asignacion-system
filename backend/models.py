@@ -222,3 +222,75 @@ class Salon:
     def es_activo(self):
         return self.activo
 
+class Profesor:
+    _db = DatabaseManager()  # Usa global para todas tablas
+
+    def __init__(self, id=None, usuario_id=None, especialidades=None, hoja_vida_url=None, activo=True, created_at=None, updated_at=None):
+        self.id = id or str(uuid.uuid4())
+        self.usuario_id = usuario_id  # FK UK a usuario.id (rol PROFESOR)
+        self.especialidades = especialidades  # TEXT
+        self.hoja_vida_url = hoja_vida_url  # VARCHAR(255)
+        self.activo = activo  # TINYINT(1)
+        self.created_at = created_at or None
+        self.updated_at = updated_at or None
+
+    @classmethod
+    def create(cls, usuario_id: str, especialidades: str = '', hoja_vida_url: str = '') -> Optional['Profesor']:
+        """HU7: Crea profesor persistente (valida usuario_id existe y rol PROFESOR)."""
+        # Stub valida: Asume usuario_id válido (futuro query Usuario.get_by_id, rol == 'PROFESOR')
+        if not usuario_id:
+            return None
+        profesor_data = {
+            'usuario_id': usuario_id,
+            'especialidades': especialidades,
+            'hoja_vida_url': hoja_vida_url,
+            'activo': True
+        }
+        profesor_id = cls._db.create_entity('profesores', profesor_data, ['usuario_id'])  # Unique 'usuario_id'
+        if profesor_id:
+            profesor_data['id'] = profesor_id
+            return cls(**profesor_data)
+        return None  # Fallo: usuario_id duplicado
+
+    @classmethod
+    def get_by_id(cls, profesor_id: str) -> Optional['Profesor']:
+        """HU8: Carga por ID."""
+        profesor_data = cls._db.get_entity_by_id('profesores', profesor_id)
+        if profesor_data:
+            return cls(**profesor_data)
+        return None
+
+    @classmethod
+    def get_all(cls) -> list['Profesor']:
+        """HU8: Lista todos profesores."""
+        profesores_data = cls._db.get_all_entities('profesores')
+        return [cls(**p) for p in profesores_data]
+
+    @classmethod
+    def update_by_id(cls, profesor_id: str, updates: Dict) -> bool:
+        """Update by ID (para API)."""
+        profesor_data = cls._db.get_entity_by_id('profesores', profesor_id)
+        if profesor_data:
+            return cls._db.update_entity('profesores', profesor_id, updates)
+        return False
+
+    @classmethod
+    def delete_by_id(cls, profesor_id: str) -> bool:
+        """Delete by ID (soft)."""
+        return cls._db.delete_entity('profesores', profesor_id)
+
+    def update(self, updates: Dict) -> bool:
+        """HU8: Actualiza."""
+        if not self.id:
+            return False
+        updates['updated_at'] = None
+        return self._db.update_entity('profesores', self.id, updates)
+
+    def delete(self) -> bool:
+        """HU8: Desactiva."""
+        if not self.id:
+            return False
+        return self.update({'activo': False})
+
+    def es_activo(self):
+        return self.activo
