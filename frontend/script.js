@@ -155,6 +155,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     dashboard.innerHTML += '<p>Acceso restringido: Solo COORDINADOR/ADMIN para profesores.</p>';
                 }
 
+                // ========== Nueva funcionalidad para Épica 10: Configuración del Sistema ==========
+                if (data.rol === 'ADMIN') {  // Simple rol check (HU19 acceso)
+                    const paramsSectionHTML = `
+                        <h3>Configuración del Sistema (Épica 10)</h3>
+                        <form id="createParamForm">
+                            <label for="paramClave">Clave:</label>
+                            <input type="text" id="paramClave" required>
+                            <label for="paramValor">Valor JSON:</label>
+                            <textarea id="paramValor" placeholder='{"periodo":"2025"}'></textarea>
+                            <label for="paramScope">Scope:</label>
+                            <input type="text" id="paramScope">
+                            <button type="submit">Crear Parámetro</button>
+                        </form>
+                        <div id="paramMessage"></div>
+                        <h3>Lista de Parámetros</h3>
+                        <ul id="paramList"></ul>
+                    `;
+                    dashboard.innerHTML += paramsSectionHTML;
+                    loadParams();  // Carga inicial lista
+
+                    // Event listener para create form
+                    const createParamForm = document.getElementById('createParamForm');
+                    createParamForm.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        createParam();
+                    });
+                } else {
+                    dashboard.innerHTML += '<p>Acceso restringido: Solo ADMIN para configuración.</p>';
+                }
+
                 // ========== FIN NUEVA FUNCIONALIDAD ==========
 
             } else {
@@ -515,5 +545,119 @@ async function deleteProfesor(profesorId) {
             console.error('Error deleting profesor:', error);
         }
     }
-}
+} 
 // ========== FIN FUNCIONES PROFESORES ==========
+
+// ========== FUNCIONES PARA PARAMETROS (NUEVAS) ==========
+// Funciones para parámetros
+async function createParam() {
+    const clave = document.getElementById('paramClave').value;
+    let valor;
+    try {
+        valor = JSON.parse(document.getElementById('paramValor').value || '{}');  // Parse JSON o empty
+    } catch (e) {
+        document.getElementById('paramMessage').textContent = 'Valor debe ser JSON válido';
+        document.getElementById('paramMessage').className = 'error';
+        return;
+    }
+    const scope = document.getElementById('paramScope').value;
+    const message = document.getElementById('paramMessage');
+
+    if (!clave) {
+        message.textContent = 'Clave requerida';
+        message.className = 'error';
+        return;
+    }
+
+    try {
+        const response = await fetch('http://localhost:8000/parametros', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clave, valor, scope })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            message.textContent = data.message || 'Parámetro creado!';
+            message.className = 'success';
+            document.getElementById('createParamForm').reset();
+            loadParams();  // Refresca lista
+        } else {
+            message.textContent = data.error || 'Error al crear';
+            message.className = 'error';
+        }
+    } catch (error) {
+        message.textContent = 'Error de conexión: ' + error.message;
+        message.className = 'error';
+    }
+}
+
+async function loadParams() {
+    try {
+        const response = await fetch('http://localhost:8000/parametros');
+        const params = await response.json();
+        const list = document.getElementById('paramList');
+        list.innerHTML = params.map(param => `
+            <li>
+                Clave: ${param.clave} - Scope: ${param.scope} - Valor: ${JSON.stringify(param.valor)} 
+                ${param.activo ? '(Activo)' : '(Inactivo)'} 
+                <button onclick="updateParam('${param.id}')">Editar</button>
+                <button onclick="deleteParam('${param.id}')">Desactivar</button>
+            </li>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading params:', error);
+    }
+}
+
+async function updateParam(paramId) {
+    const valorStr = prompt('Nuevo valor JSON (actual: ?)', '');  // Simple prompt para update (HU19)
+    let valor;
+    try {
+        valor = JSON.parse(valorStr || '{}');
+    } catch (e) {
+        document.getElementById('paramMessage').textContent = 'Valor debe ser JSON válido';
+        document.getElementById('paramMessage').className = 'error';
+        return;
+    }
+    try {
+        const response = await fetch(`http://localhost:8000/parametros/${paramId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ valor })
+        });
+        const data = await response.json();
+        if (response.ok) {
+            document.getElementById('paramMessage').textContent = data.message;
+            document.getElementById('paramMessage').className = 'success';
+            loadParams();  // Refresca
+        } else {
+            document.getElementById('paramMessage').textContent = data.error;
+            document.getElementById('paramMessage').className = 'error';
+        }
+    } catch (error) {
+        console.error('Error updating param:', error);
+    }
+}
+
+async function deleteParam(paramId) {
+    if (confirm('Desactivar parámetro?')) {
+        try {
+            const response = await fetch(`http://localhost:8000/parametros/${paramId}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById('paramMessage').textContent = data.message;
+                document.getElementById('paramMessage').className = 'success';
+                loadParams();  // Refresca
+            } else {
+                document.getElementById('paramMessage').textContent = data.error;
+                document.getElementById('paramMessage').className = 'error';
+            }
+        } catch (error) {
+            console.error('Error deleting param:', error);
+        }
+    }
+}
+// ========== FIN FUNCIONES PARAMETROS ==========
