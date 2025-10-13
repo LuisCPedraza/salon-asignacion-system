@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Asignación de Salones - Login</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Iniciar Sesión</h1>
+        <form id="loginForm">
+            <label for="email">Email:</label>
+            <input type="email" id="email" required>
+            <label for="password">Contraseña:</label>
+            <input type="password" id="password" required>
+            <button type="submit">Ingresar</button>
+        </form>
+        <div id="message"></div>
+        <div id="dashboard" style="display: none;">
+            <h2>Bienvenido, <span id="userRol"></span>!</h2>
+            <p>Dashboard por rol (stub para HU13-HU15).</p>
+            <button onclick="logout()">Salir</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -56,6 +56,14 @@ class APIServerRequestHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(data).encode('utf-8'))
 
+    def do_OPTIONS(self):
+        """Maneja preflight CORS para POST/GET (browser cross-origin)."""
+        self.send_response(HTTPStatus.OK)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+
 if __name__ == '__main__':
     with socketserver.TCPServer(("", PORT), APIServerRequestHandler) as httpd:
         print(f"API server corriendo en http://localhost:{PORT}")
