@@ -124,6 +124,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     dashboard.innerHTML += '<p>Acceso restringido: Solo coord_INFRA/ADMIN para salones.</p>';
                 }
+
+                // ========== Nueva funcionalidad para Épica 4: Gestión de Profesores ==========
+                if (data.rol === 'COORDINADOR' || data.rol === 'ADMIN') {  // Simple rol check (HU7-HU8 acceso)
+                    const profesoresSectionHTML = `
+                        <h3>Gestión de Profesores (Épica 4)</h3>
+                        <form id="createProfesorForm">
+                            <label for="profesorUsuarioId">Usuario ID:</label>
+                            <input type="text" id="profesorUsuarioId" required>
+                            <label for="profesorEspecialidades">Especialidades:</label>
+                            <textarea id="profesorEspecialidades"></textarea>
+                            <label for="profesorHojaVida">Hoja de Vida URL:</label>
+                            <input type="url" id="profesorHojaVida">
+                            <button type="submit">Crear Profesor</button>
+                        </form>
+                        <div id="profesorMessage"></div>
+                        <h3>Lista de Profesores</h3>
+                        <ul id="profesorList"></ul>
+                    `;
+                    dashboard.innerHTML += profesoresSectionHTML;
+                    loadProfesores();  // Carga inicial lista
+
+                    // Event listener para create form
+                    const createProfesorForm = document.getElementById('createProfesorForm');
+                    createProfesorForm.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        createProfesor();
+                    });
+                } else {
+                    dashboard.innerHTML += '<p>Acceso restringido: Solo COORDINADOR/ADMIN para profesores.</p>';
+                }
+
                 // ========== FIN NUEVA FUNCIONALIDAD ==========
 
             } else {
@@ -384,3 +415,105 @@ async function deleteSalon(salonId) {
     }
 }
 // ========== FIN FUNCIONES SALONES ==========
+
+// ========== FUNCIONES PARA PROFESORES (NUEVAS) ==========
+// Funciones para profesores 
+async function createProfesor() {
+    const usuario_id = document.getElementById('profesorUsuarioId').value;
+    const especialidades = document.getElementById('profesorEspecialidades').value;
+    const hoja_vida_url = document.getElementById('profesorHojaVida').value;
+    const message = document.getElementById('profesorMessage');
+
+    if (!usuario_id) {
+        message.textContent = 'Usuario ID requerido';
+        message.className = 'error';
+        return;
+    }
+
+    try {
+        const response = await fetch('http://localhost:8000/profesores', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usuario_id, especialidades, hoja_vida_url })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            message.textContent = data.message || 'Profesor creado!';
+            message.className = 'success';
+            document.getElementById('createProfesorForm').reset();
+            loadProfesores();  // Refresca lista
+        } else {
+            message.textContent = data.error || 'Error al crear';
+            message.className = 'error';
+        }
+    } catch (error) {
+        message.textContent = 'Error de conexión: ' + error.message;
+        message.className = 'error';
+    }
+}
+
+async function loadProfesores() {
+    try {
+        const response = await fetch('http://localhost:8000/profesores');
+        const profesores = await response.json();
+        const list = document.getElementById('profesorList');
+        list.innerHTML = profesores.map(profesor => `
+            <li>
+                Usuario ID: ${profesor.usuario_id} - Especialidades: ${profesor.especialidades} 
+                ${profesor.hoja_vida_url ? `- Hoja: ${profesor.hoja_vida_url}` : ''} 
+                ${profesor.activo ? '(Activo)' : '(Inactivo)'} 
+                <button onclick="updateProfesor('${profesor.id}')">Editar</button>
+                <button onclick="deleteProfesor('${profesor.id}')">Desactivar</button>
+            </li>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading profesores:', error);
+    }
+}
+
+async function updateProfesor(profesorId) {
+    const espec = prompt('Nuevas especialidades (actual: ?)', '');  // Simple prompt para update (HU8)
+    if (espec) {
+        try {
+            const response = await fetch(`http://localhost:8000/profesores/${profesorId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ especialidades: espec })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById('profesorMessage').textContent = data.message;
+                document.getElementById('profesorMessage').className = 'success';
+                loadProfesores();  // Refresca
+            } else {
+                document.getElementById('profesorMessage').textContent = data.error;
+                document.getElementById('profesorMessage').className = 'error';
+            }
+        } catch (error) {
+            console.error('Error updating profesor:', error);
+        }
+    }
+}
+
+async function deleteProfesor(profesorId) {
+    if (confirm('Desactivar profesor?')) {
+        try {
+            const response = await fetch(`http://localhost:8000/profesores/${profesorId}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById('profesorMessage').textContent = data.message;
+                document.getElementById('profesorMessage').className = 'success';
+                loadProfesores();  // Refresca
+            } else {
+                document.getElementById('profesorMessage').textContent = data.error;
+                document.getElementById('profesorMessage').className = 'error';
+            }
+        } catch (error) {
+            console.error('Error deleting profesor:', error);
+        }
+    }
+}
+// ========== FIN FUNCIONES PROFESORES ==========
