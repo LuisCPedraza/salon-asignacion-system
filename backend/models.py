@@ -1,6 +1,6 @@
 import uuid
 import hashlib
-from typing import Optional, Dict
+from typing import List, Optional, Dict
 from database import DatabaseManager  # Importa para integración
 
 class Usuario:
@@ -429,12 +429,55 @@ class Asignacion:
         asignacion_data = cls._db.get_entity_by_id('asignaciones', asignacion_id)
         if asignacion_data:
             return cls._db.update_entity('asignaciones', asignacion_id, updates)
-        return False
+        return False  
 
     @classmethod
     def delete_by_id(cls, asignacion_id: str) -> bool:
         """Delete by ID (soft)."""
         return cls._db.delete_entity('asignaciones', asignacion_id)
+    
+    @classmethod
+    def auto_assign(cls, parametros_prioridades: Dict = None) -> List[str]:
+        """HU9-HU10: Algoritmo automático stub (random matching con score, considera cap/disponibilidad stub)."""
+        if parametros_prioridades is None:
+            parametros_prioridades = {"prioridad_cap": 0.5, "prioridad_prox": 0.3, "minimizar_cambios": True}  # Stub from /parametros
+
+        # Stub: Get active data (futuro filter disponibilidad)
+        grupos = Grupo.get_all()
+        salones = Salon.get_all()
+        profesores = Profesor.get_all()
+
+        active_grupos = [g for g in grupos if g.es_activo()]
+        active_salones = [s for s in salones if s.es_activo()]
+        active_profesores = [p for p in profesores if p.es_activo()]
+
+        if not (active_grupos and active_salones and active_profesores):
+            return []  # No data
+
+        asign_ids = []
+        import random  # Stdlib for stub random
+
+        for grupo in active_grupos:
+            # Stub random assign (futuro optimización con prioridades, e.g., sort by score)
+            salon = random.choice(active_salones)
+            profesor = random.choice(active_profesores)
+            if grupo.num_estudiantes <= salon.capacidad:  # Considera capacidad
+                # Stub bloque/periodo (futuro from parametros)
+                dummy_bloque = 'dummy-bloque-uuid'
+                dummy_periodo = 'dummy-periodo-uuid'
+                dummy_created_by = 'auto-system'
+                score = random.uniform(0, 1) * parametros_prioridades["prioridad_cap"]  # Stub score
+
+                asignacion = cls.create(grupo.id, salon.id, profesor.id, dummy_bloque, dummy_periodo, 'Automática', dummy_created_by)
+                if asignacion:
+                    asignacion.score = score
+                    asignacion.update({'score': score})
+                    asign_ids.append(asignacion.id)
+            else:
+                # Skip if no match (futuro conflict log)
+                pass
+
+        return asign_ids  # Return IDs created    
 
     def update(self, updates: Dict) -> bool:
         """HU12: Actualiza (e.g., confirmar estado)."""
