@@ -185,6 +185,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     dashboard.innerHTML += '<p>Acceso restringido: Solo ADMIN para configuración.</p>';
                 }
 
+                // ========== Nueva funcionalidad para Épica 6: Asignación Manual ==========
+                if (data.rol === 'COORDINADOR' || data.rol === 'ADMIN') {  // Simple rol check (HU11-HU12 acceso)
+                    const asignSectionHTML = `
+                        <h3>Asignación Manual (Épica 6)</h3>
+                        <div id="dragGroups" class="drag-zone">
+                            <h4>Grupos Disponibles (Drag aquí)</h4>
+                            <ul id="groupsList"></ul>
+                        </div>
+                        <div id="dropSalones" class="drop-zone">
+                            <h4>Salones (Drop aquí)</h4>
+                            <ul id="salonesList"></ul>
+                        </div>
+                        <div id="asignMessage"></div>
+                        <h4>Asignaciones Actuales</h4>
+                        <ul id="asignList"></ul>
+                    `;
+                    dashboard.innerHTML += asignSectionHTML;
+                    loadGroupsForDrag();  // Carga grupos draggable
+                    loadSalonesForDrop();  // Carga salones drop zones
+                    loadAsignaciones();  // Lista asignaciones
+
+                    // Event listeners para drag/drop
+                    document.getElementById('dropSalones').addEventListener('dragover', (e) => e.preventDefault());
+                    document.getElementById('dropSalones').addEventListener('drop', handleDrop);
+                } else {
+                    dashboard.innerHTML += '<p>Acceso restringido: Solo COORDINADOR/ADMIN para asignaciones.</p>';
+                }
                 // ========== FIN NUEVA FUNCIONALIDAD ==========
 
             } else {
@@ -661,3 +688,132 @@ async function deleteParam(paramId) {
     }
 }
 // ========== FIN FUNCIONES PARAMETROS ==========
+
+// ========== FUNCIONES PARA ASIGNACION MANUAL (NUEVAS) ==========
+// Funciones para asignación manual
+async function loadGroupsForDrag() {
+    try {
+        const response = await fetch('http://localhost:8000/grupos');
+        const groups = await response.json();
+        const list = document.getElementById('groupsList');
+        list.innerHTML = groups.filter(g => g.activo).map(group => `
+            <li draggable="true" ondragstart="drag(event)" data-id="${group.id}" data-num="${group.num_estudiantes}">
+                ${group.nombre} (${group.nivel}) - ${group.num_estudiantes} est.
+            </li>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading groups for drag:', error);
+    }
+}
+
+async function loadSalonesForDrop() {
+    try {
+        const response = await fetch('http://localhost:8000/salones');
+        const salones = await response.json();
+        const list = document.getElementById('salonesList');
+        list.innerHTML = salones.filter(s => s.activo).map(salon => `
+            <li class="drop-target" data-id="${salon.id}" data-cap="${salon.capacidad}">
+                ${salon.codigo} (Cap: ${salon.capacidad}) - ${salon.ubicacion}
+            </li>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading salones for drop:', error);
+    }
+}
+
+async function loadAsignaciones() {
+    try {
+        const response = await fetch('http://localhost:8000/asignaciones');
+        const asignaciones = await response.json();
+        const list = document.getElementById('asignList');
+        list.innerHTML = asignaciones.map(asign => `
+            <li>
+                Grupo: ${asign.grupo_id} → Salón: ${asign.salon_id} (${asign.estado}) 
+                ${asign.activo ? '(Activa)' : '(Anulada)'} 
+                <button onclick="deleteAsign('${asign.id}')">Eliminar</button>
+            </li>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading asignaciones:', error);
+    }
+}
+
+// Drag & Drop logic (HU11)
+function drag(e) {
+    console.log('Drag start:', e.target.dataset.id);  // Debug trigger
+    e.dataTransfer.setData('text', e.target.dataset.id);
+    e.dataTransfer.setData('num', e.target.dataset.num);
+}
+
+async function handleDrop(e) {
+    e.preventDefault();
+    console.log('Drop on:', e.target.dataset.id);  // Debug trigger
+    const grupoId = e.dataTransfer.getData('text');
+    const numEst = parseInt(e.dataTransfer.getData('num'));
+    const salonId = e.target.dataset.id;
+    const capSalon = parseInt(e.target.dataset.cap);
+    const message = document.getElementById('asignMessage');
+
+    if (!grupoId || !salonId) {
+        message.textContent = 'IDs inválidos en drag-drop';
+        message.className = 'error';
+        return;
+    }
+
+    if (numEst > capSalon) {
+        message.textContent = 'Conflicto: Sobrecupo (estudiantes > capacidad)';
+        message.className = 'error';
+        return;  // HU12: Visualiza conflicto
+    }
+
+    // Stub dummy UUIDs para profesor/bloque/periodo (futuro select UI)
+    const dummyProf = 'dummy-prof-uuid';
+    const dummyBloque = 'dummy-bloque-uuid';
+    const dummyPeriodo = 'dummy-periodo-uuid';
+    const dummyCreatedBy = 'admin-uuid';  // From login rol
+
+    try {
+        const response = await fetch('http://localhost:8000/asignaciones', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                grupo_id: grupoId, salon_id: salonId, profesor_id: dummyProf, bloque_id: dummyBloque, periodo_id: dummyPeriodo, origen: 'Manual', created_by: dummyCreatedBy 
+            })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            message.textContent = data.message || 'Asignación manual creada!';
+            message.className = 'success';
+            loadAsignaciones();  // Refresca lista
+        } else {
+            message.textContent = data.error || 'Error al asignar';
+            message.className = 'error';
+        }
+    } catch (error) {
+        message.textContent = 'Error de conexión: ' + error.message;
+        message.className = 'error';
+    }
+}
+
+async function deleteAsign(asignId) {
+    if (confirm('Eliminar asignación?')) {
+        try {
+            const response = await fetch(`http://localhost:8000/asignaciones/${asignId}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById('asignMessage').textContent = data.message;
+                document.getElementById('asignMessage').className = 'success';
+                loadAsignaciones();  // Refresca
+            } else {
+                document.getElementById('asignMessage').textContent = data.error;
+                document.getElementById('asignMessage').className = 'error';
+            }
+        } catch (error) {
+            console.error('Error deleting asign:', error);
+        }
+    }
+}
+// ========== FIN FUNCIONES ASIGNACION MANUAL ==========
