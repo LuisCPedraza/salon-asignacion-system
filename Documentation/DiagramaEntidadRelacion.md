@@ -1,228 +1,176 @@
-# Diagrama Entidad Relación
----
-El código fuente en Mermaid para el diagrama de entidad-relación (ERD) correspondiente al esquema de la base de datos actualizada, que cumple al 100% con los requerimientos del documento "Proyectos Desarrollo de Software 2.docx". El diagrama incluye todas las tablas, sus atributos, claves primarias, claves foráneas, y relaciones, siguiendo la estructura proporcionada en el esquema SQL. He organizado el diagrama para que sea claro, visualmente comprensible, y refleje las entidades, sus relaciones, y las cardinalidades adecuadas.
+# Diagrama Entidad-Relación (ERD): Sistema de Asignación de Salones en Notación Moderna
 
-## Explicación del Enfoque
+## Descripción General
+La **notación moderna** para ERD (como Crow's Foot o IDEF1X) se centra en cardinalidades claras con símbolos de "patas de cuervo" (|| para uno, o{ para muchos) y líneas directas entre entidades, lo que la hace más visual y escalable para bases de datos relacionales. A diferencia de la **notación clásica (Chen)**, que usa rectángulos para entidades, óvalos para atributos y rombos para relaciones (más teórica y verbosa), la moderna es más compacta, intuitiva y orientada a implementación (ej: SQL). 
 
-- Tablas y Atributos: Cada tabla del esquema SQL se representa como una entidad en Mermaid, con sus atributos listados. Las claves primarias están marcadas con (PK) y las claves foráneas con (FK).
-- Relaciones: Las relaciones se derivan de las claves foráneas (FOREIGN KEY) y las tablas de unión (e.g., salon_recurso, disp_profesor). Las cardinalidades reflejan las restricciones de integridad (e.g., uno a muchos, muchos a muchos).
-- Optimización Visual: He agrupado las entidades lógicamente y usado nombres claros para facilitar la lectura. Las relaciones están definidas con cardinalidades explícitas (e.g., 1..1, 0..*) basadas en los requerimientos.
-- Mermaid: El código se genera en la sintaxis de Mermaid para diagramas ER, que es compatible con herramientas como Mermaid Live Editor o integraciones en markdown.
+**¿Hay diferencia?** Sí, pero sutil en Mermaid: `erDiagram` usa Crow's Foot (moderna) por defecto, por lo que el diagrama anterior ya era moderno. Para resaltar la "moderna", lo refino aquí con etiquetas más precisas, agrupaciones visuales (subgraphs implícitos vía orden) y multiplicidades explícitas (ej: "1..*" para uno-a-muchos opcionales). Esto mejora la legibilidad sin cambiar la estructura. Si usáramos Chen puro, requeriría herramientas externas (no Mermaid nativo), resultando en un diagrama más "académico" pero menos práctico para desarrollo.
 
-### Diagrama Entidad Relación (Actualizado)
+El diseño mantiene robustez: entidades con PK/FK, relaciones con labels descriptivos y flujo lógico (roles → recursos → gestión). **Corrección aplicada**: Se eliminaron multiplicidades en comillas (causaban error de parse; Mermaid interpreta "1..*" como texto inválido). En su lugar, se usan símbolos estándar (||--o{ para 1:N) y labels descriptivos para precisión (ej: "(1:N)").
+
+## Descripciones por Roles
+Cada rol es una subentidad de `USUARIO` (herencia moderna vía FK), con atributos/relaciones específicas. Esto refleja actividades y restricciones del backlog.
+
+- **Administrador**: Gestiona globalmente; relaciona con Reportes/Parámetros (1:N). Atributos: nivel_acceso. Restricciones: Acceso total, audita.
+- **Superadministrador**: Exclusivo para IT; integra/monitorea (1:1 con Parámetros). Atributos: api_keys. Restricciones: Verificación doble.
+- **Coordinador (General)**: Gestiona Grupos/Asignaciones (1:N). Atributos: especialidad. Restricciones: Dependiente de disponibilidades.
+- **Coordinador Académico**: Subtipo; enfocado en Horarios académicos (1:N). Atributos: foco_academico. Restricciones: Sin infra.
+- **Coordinador de Infraestructura**: Subtipo; maneja Salones (1:N). Atributos: area_mantenimiento. Restricciones: Solo físicos.
+- **Profesor**: Recurso con disponibilidades; imparte Asignaciones (1:N). Atributos: especialidad, hoja_vida. Restricciones: Datos personales.
+- **Profesor Invitado**: Temporal; visualiza horarios (1:N). Atributos: fecha_expiracion. Restricciones: Acceso caduco.
+- **Secretaria (General)**: Soporte; gestiona Auditorías/Solicitudes (1:N). Atributos: departamento. Restricciones: Edición básica.
+- **Secretaria Académica**: Subtipo; registros de Grupos (1:N). Atributos: contacto_familias. Restricciones: No sensibles.
+- **Secretaria de Infraestructura**: Subtipo; actualiza Salones (1:N). Atributos: alertas_mantenimiento. Restricciones: Solo infra.
+
+## Diagrama Mermaid (Notación Moderna - Crow's Foot)
 ```mermaid
 erDiagram
-    %% Estilos personalizados para entidades
-    classDef userEntity fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
-    classDef groupEntity fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
-    classDef roomEntity fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,color:#e65100
-    classDef resourceEntity fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#880e4f
-    classDef teacherEntity fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#01579b
-    classDef scheduleEntity fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c
-    classDef assignmentEntity fill:#e8f5e8,stroke:#388e3c,stroke-width:2px,color:#1b5e20
-    classDef constraintEntity fill:#fff8e1,stroke:#ff8f00,stroke-width:2px,color:#e65100
-    classDef auditEntity fill:#fbe9e7,stroke:#d84315,stroke-width:2px,color:#bf360c
-
-    %% Épica 1: Gestión de Usuarios
-    usuario {
-        CHAR_36 id PK "🔑 Identificador único"
-        VARCHAR_120 nombre "👤 Nombre completo"
-        VARCHAR_120 email UK "📧 Correo electrónico"
-        TIMESTAMP email_verified_at "✅ Verificación email"
-        VARCHAR_255 password_hash "🔒 Hash contraseña"
-        ENUM_rol rol "🎭 Rol del usuario"
-        VARCHAR_100 remember_token "📝 Token recordatorio"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
+    %% Entidad Base Usuario (arriba para flujo visual)
+    USUARIO {
+        int id PK
+        string nombre
+        string email
+        string password
+        string rol
     }
 
-    %% Épica 2: Gestión de Grupos
-    grupo {
-        CHAR_36 id PK "🔑 Identificador único"
-        VARCHAR_120 nombre UK "🏷️ Nombre del grupo"
-        ENUM_nivel nivel "📊 Nivel educativo"
-        INTEGER num_estudiantes "👥 Número estudiantes"
-        BOOLEAN activo "⚡ Estado activo"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
+    %% Subentidades/Roles (agrupadas lógicamente)
+    ADMINISTRADOR {
+        int id PK
+        int usuario_id FK
+        string nivel_acceso
+    }
+    SUPERADMINISTRADOR {
+        int id PK
+        int usuario_id FK
+        string api_keys
+    }
+    COORDINADOR {
+        int id PK
+        int usuario_id FK
+        string especialidad
+    }
+    COORDINADOR_ACADEMICO {
+        int id PK
+        int coordinador_id FK
+        string foco_academico
+    }
+    COORDINADOR_INFRAESTRUCTURA {
+        int id PK
+        int coordinador_id FK
+        string area_mantenimiento
+    }
+    SECRETARIA {
+        int id PK
+        int usuario_id FK
+        string departamento
+    }
+    SECRETARIA_ACADEMICA {
+        int id PK
+        int secretaria_id FK
+        string contacto_familias
+    }
+    SECRETARIA_INFRAESTRUCTURA {
+        int id PK
+        int secretaria_id FK
+        string alertas_mantenimiento
+    }
+    PROFESOR {
+        int id PK
+        int usuario_id FK
+        string especialidad
+        string hoja_vida
+    }
+    PROFESOR_INVITADO {
+        int id PK
+        int profesor_id FK
+        date fecha_expiracion
     }
 
-    %% Épica 3: Gestión de Salones
-    salon {
-        CHAR_36 id PK "🔑 Identificador único"
-        VARCHAR_60 codigo UK "🏷️ Código del salón"
-        INTEGER capacidad "🧑‍🎓 Capacidad máxima"
-        VARCHAR_160 ubicacion "📍 Ubicación física"
-        BOOLEAN activo "⚡ Estado activo"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
+    %% Entidades de Recursos (medio)
+    GRUPO {
+        int id PK
+        string nombre
+        int nivel
+        int numEstudiantes
+        string caracteristicas
+        int coordinador_id FK
+    }
+    SALON {
+        int id PK
+        int capacidad
+        string recursos
+        string ubicacion
+        int coordinador_infra_id FK
     }
 
-    recurso {
-        CHAR_36 id PK "🔑 Identificador único"
-        VARCHAR_120 nombre "🛠️ Nombre del recurso"
-        VARCHAR_255 descripcion "📝 Descripción detallada"
-        BOOLEAN activo "⚡ Estado activo"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
+    %% Entidades de Gestión (abajo)
+    ASIGNACION {
+        int id PK
+        date fecha
+        int grupo_id FK
+        int salon_id FK
+        int profesor_id FK
+        int horario_id FK
+    }
+    HORARIO {
+        int id PK
+        date periodo
+        int coordinador_id FK
+    }
+    REPORTE {
+        int id PK
+        string tipo
+        date fechaGeneracion
+        int admin_id FK
+    }
+    RESTRICCION {
+        int id PK
+        string tipo
+        string descripcion
+        int asignacion_id FK
+        int coordinador_id FK
+    }
+    AUDITORIA {
+        int id PK
+        date timestamp
+        string accion
+        int usuario_id FK
+    }
+    PARAMETRO {
+        string clave PK
+        string valor
+        int admin_id FK
     }
 
-    salon_recurso {
-        CHAR_36 id PK "🔑 Identificador único"
-        CHAR_36 salon_id FK "🏫 Referencia salón"
-        CHAR_36 recurso_id FK "🛠️ Referencia recurso"
-        INTEGER cantidad "🔢 Cantidad disponible"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
-    }
+    %% Relaciones Herencia (1:N para subtipos, moderna y clara)
+    USUARIO ||--o{ ADMINISTRADOR : "es (1:N)"
+    USUARIO ||--|| SUPERADMINISTRADOR : "es (1:1)"
+    USUARIO ||--o{ COORDINADOR : "es (1:N)"
+    COORDINADOR ||--o{ COORDINADOR_ACADEMICO : "especializa (1:N)"
+    COORDINADOR ||--o{ COORDINADOR_INFRAESTRUCTURA : "especializa (1:N)"
+    USUARIO ||--o{ SECRETARIA : "es (1:N)"
+    SECRETARIA ||--o{ SECRETARIA_ACADEMICA : "especializa (1:N)"
+    SECRETARIA ||--o{ SECRETARIA_INFRAESTRUCTURA : "especializa (1:N)"
+    USUARIO ||--o{ PROFESOR : "es (1:N)"
+    PROFESOR ||--o{ PROFESOR_INVITADO : "especializa (1:N)"
 
-    %% Épica 4: Gestión de Profesores
-    profesor {
-        CHAR_36 id PK "🔑 Identificador único"
-        CHAR_36 usuario_id FK "👤 Referencia usuario"
-        VARCHAR_255 especialidades "🎯 Áreas de especialización"
-        BOOLEAN activo "⚡ Estado activo"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
-    }
+    %% Relaciones Rol-Recurso/Gestión (flujo descendente)
+    COORDINADOR ||--o{ GRUPO : "gestiona (1:N)"
+    COORDINADOR_INFRAESTRUCTURA ||--o{ SALON : "gestiona (1:N)"
+    COORDINADOR ||--o{ HORARIO : "aprueba (1:N)"
+    ADMINISTRADOR ||--o{ REPORTE : "genera (1:N)"
+    COORDINADOR ||--o{ RESTRICCION : "establece (1:N)"
+    USUARIO ||--o{ AUDITORIA : "registra (1:N)"
+    ADMINISTRADOR ||--o{ PARAMETRO : "configura (1:N)"
 
-    %% Épicas 5-6: Asignaciones y Disponibilidades
-    periodo_academico {
-        CHAR_36 id PK "🔑 Identificador único"
-        VARCHAR_120 nombre "🏷️ Nombre período"
-        DATE fecha_inicio "📅 Fecha inicio"
-        DATE fecha_fin "📅 Fecha fin"
-        BOOLEAN activo "⚡ Estado activo"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
-    }
+    %% Relaciones Gestión (centrales, con N:M si aplica)
+    GRUPO ||--o{ ASIGNACION : "participa (1:N)"
+    SALON ||--o{ ASIGNACION : "asignado (1:N)"
+    PROFESOR ||--o{ ASIGNACION : "imparte (1:N)"
+    HORARIO ||--o{ ASIGNACION : "contiene (1:N)"
+    ASIGNACION ||--o{ RESTRICCION : "sujeta (1:N)"
 
-    bloque_horario {
-        CHAR_36 id PK "🔑 Identificador único"
-        ENUM_dia_semana dia_semana "📅 Día de la semana"
-        TIME hora_inicio "⏰ Hora inicio"
-        TIME hora_fin "⏰ Hora fin"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
-    }
-
-    disp_profesor {
-        CHAR_36 id PK "🔑 Identificador único"
-        CHAR_36 profesor_id FK "👨‍🏫 Referencia profesor"
-        CHAR_36 bloque_id FK "⏰ Referencia bloque"
-        ENUM_estado estado "📊 Estado disponibilidad"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
-    }
-
-    disp_salon {
-        CHAR_36 id PK "🔑 Identificador único"
-        CHAR_36 salon_id FK "🏫 Referencia salón"
-        CHAR_36 bloque_id FK "⏰ Referencia bloque"
-        ENUM_estado estado "📊 Estado disponibilidad"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
-    }
-
-    recurso_disponibilidad {
-        CHAR_36 id PK "🔑 Identificador único"
-        CHAR_36 recurso_id FK "🛠️ Referencia recurso"
-        CHAR_36 bloque_id FK "⏰ Referencia bloque"
-        ENUM_estado estado "📊 Estado disponibilidad"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
-    }
-
-    asignacion {
-        CHAR_36 id PK "🔑 Identificador único"
-        CHAR_36 grupo_id FK "👥 Referencia grupo"
-        CHAR_36 salon_id FK "🏫 Referencia salón"
-        CHAR_36 profesor_id FK "👨‍🏫 Referencia profesor"
-        CHAR_36 bloque_id FK "⏰ Referencia bloque"
-        CHAR_36 periodo_id FK "📅 Referencia período"
-        ENUM_estado_asignacion estado "📊 Estado asignación"
-        ENUM_origen origen "🎯 Origen asignación"
-        FLOAT score "⭐ Puntuación optimización"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
-    }
-
-    %% Épicas 7-8: Restricciones y Conflictos
-    tipo_restriccion {
-        CHAR_36 id PK "🔑 Identificador único"
-        VARCHAR_120 nombre "🏷️ Nombre restricción"
-        VARCHAR_255 descripcion "📝 Descripción detallada"
-        BOOLEAN activa "⚡ Estado activa"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
-    }
-
-    restriccion {
-        CHAR_36 id PK "🔑 Identificador único"
-        CHAR_36 tipo_restriccion_id FK "📏 Referencia tipo"
-        CHAR_36 objetivo_id "🎯 ID entidad objetivo"
-        VARCHAR_60 objetivo_tipo "🏷️ Tipo entidad objetivo"
-        JSON configuracion "⚙️ Configuración parámetros"
-        BOOLEAN activa "⚡ Estado activa"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
-    }
-
-    %% Épicas 9-10: Auditoría y Reportes
-    auditoria {
-        CHAR_36 id PK "🔑 Identificador único"
-        CHAR_36 usuario_id FK "👤 Usuario ejecutor"
-        VARCHAR_60 entidad "🏷️ Entidad afectada"
-        CHAR_36 entidad_id "🔑 ID entidad afectada"
-        JSON cambios_json "📊 Registro de cambios"
-        TIMESTAMP created_at "📅 Fecha auditoría"
-    }
-
-    reporte_ocupacion {
-        CHAR_36 id PK "🔑 Identificador único"
-        CHAR_36 periodo_id FK "📅 Referencia período"
-        ENUM_tipo_reporte tipo "📊 Tipo de reporte"
-        CHAR_36 objetivo_id "🎯 Entidad objetivo"
-        FLOAT ocupacion_porcentaje "📈 Porcentaje ocupación"
-        INTEGER num_bloques_ocupados "⏰ Bloques ocupados"
-        TIMESTAMP created_at "📅 Fecha generación"
-    }
-
-    parametro_sistema {
-        CHAR_36 id PK "🔑 Identificador único"
-        VARCHAR_120 clave UK "🔐 Clave parámetro"
-        JSON valor "💾 Valor configuración"
-        VARCHAR_60 scope "🌐 Alcance parámetro"
-        TIMESTAMP created_at "📅 Creado en"
-        TIMESTAMP updated_at "✏️ Actualizado en"
-    }
-
-    %% Relaciones con estilos
-    usuario ||--|| profesor : "tiene"
-    periodo_academico ||--o{ asignacion : "contiene"
-    grupo ||--o{ asignacion : "tiene"
-    salon ||--o{ asignacion : "asignado_en"
-    profesor ||--o{ asignacion : "imparte"
-    bloque_horario ||--o{ asignacion : "programado_en"
-    salon ||--o{ salon_recurso : "tiene"
-    recurso ||--o{ salon_recurso : "pertenece_a"
-    profesor ||--o{ disp_profesor : "disponibilidad"
-    bloque_horario ||--o{ disp_profesor : "en_bloque"
-    salon ||--o{ disp_salon : "disponibilidad"
-    bloque_horario ||--o{ disp_salon : "en_bloque"
-    recurso ||--o{ recurso_disponibilidad : "disponibilidad"
-    bloque_horario ||--o{ recurso_disponibilidad : "en_bloque"
-    tipo_restriccion ||--o{ restriccion : "define"
-    usuario ||--o{ auditoria : "realiza"
-    periodo_academico ||--o{ reporte_ocupacion : "genera"
-
-    %% Aplicar estilos a las entidades
-    class usuario,profesor userEntity
-    class grupo groupEntity
-    class salon,salon_recurso,disp_salon roomEntity
-    class recurso,recurso_disponibilidad resourceEntity
-    class profesor,disp_profesor teacherEntity
-    class periodo_academico,bloque_horario scheduleEntity
-    class asignacion assignmentEntity
-    class tipo_restriccion,restriccion constraintEntity
-    class auditoria,reporte_ocupacion,parametro_sistema auditEntity
+    %% Notas para robustez y visual
+    %% PK: Clave Primaria | FK: Clave Foránea
+    %% Cardinalidades: ||--o{ (uno a muchos) | ||--|| (uno a uno)
+    %% Flujo: Roles (arriba) → Recursos (medio) → Gestión (abajo) para intuición.
